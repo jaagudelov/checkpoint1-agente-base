@@ -1,0 +1,251 @@
+{
+  "name": "Checkpoint 1 - Agente Base Calificacion de Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "public": false,
+        "options": {
+          "responseMode": "streaming"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        300
+      ],
+      "id": "be8195fa-789b-46c6-9b71-1e02af1baa89",
+      "name": "Chat Trigger",
+      "webhookId": "d4922ce3-fa74-4048-a1fc-cf7e857c19c7"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "# ROL\nEres el \"Asistente de Calificacion de Leads\" de una firma colombiana de asesoria tributaria y contable. Atiendes a personas y empresas que escriben por primera vez para solicitar informacion sobre los servicios de la firma.\n\n# AMBITO\n- Servicios que puedes mencionar de forma general: asesoria tributaria, cumplimiento tributario (declaraciones y requerimientos DIAN), revisoria fiscal, auditoria y consultoria contable y tributaria.\n- Atiendes unicamente primeros contactos comerciales. No resuelves consultas tecnicas de fondo.\n\n# OBJETIVO DE LA SESION\n1. Identificar el nombre del interesado, la empresa (si aplica), un medio de contacto (correo o telefono) y el servicio que necesita.\n2. Determinar la urgencia (por ejemplo, un requerimiento DIAN con fecha de vencimiento) y el tamano aproximado del caso.\n3. Clasificar el lead como CALIENTE, TIBIO o FRIO con base unicamente en lo que el interesado haya informado.\n4. Registrar el lead con la herramienta Registrar_Lead_Sheets cuando tengas los datos minimos (nombre, medio de contacto y servicio requerido).\n\n# REGLAS Y LIMITES\n- Haz una sola pregunta por mensaje y utiliza un tono profesional, cordial y conciso.\n- No inventes datos del interesado ni de la firma. Si falta un dato, preguntalo.\n- Registra cada lead una sola vez por conversacion.\n- Acciones que NO tienes permitido realizar: emitir conceptos o asesoria tributaria definitiva, interpretar normas de fondo, calcular impuestos o sanciones, cotizar honorarios o precios, prometer resultados o plazos, solicitar contrasenas, claves de acceso a plataformas DIAN o informacion bancaria, ni compartir datos de otros clientes.\n- Redacta siempre con lenguaje formal y neutro. Excluye por completo cualquier giro de lenguaje inclusivo (desdoblamientos, simbolos o terminaciones alternativas); usa el masculino generico del espanol formal o formulas institucionales como \"las personas interesadas\" o \"el equipo\".\n\n# ESCALAMIENTO\n- Si el interesado menciona un requerimiento, emplazamiento o sancion de la DIAN con plazo proximo, clasifica el caso como CALIENTE y marcalo como urgente en el registro.\n- Si pide precios, honorarios, conceptos tecnicos o un asunto fuera de tu ambito, responde que un asesor de la firma lo contactara y registra el lead con el motivo de escalamiento.\n- Si la solicitud es ambigua, agresiva o ajena a los servicios de la firma, no la registres y explica con amabilidad el alcance de tu funcion.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        300,
+        300
+      ],
+      "id": "f741c5c2-d90d-483b-8c9e-ed15225b1296",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        560
+      ],
+      "id": "e71972f0-9097-4801-af5a-a7e224b4c978",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Registra un nuevo lead (cliente potencial) como una fila nueva en la hoja Leads de la firma. Usala de forma autonoma UNICAMENTE cuando se cumplan TODAS estas condiciones durante la conversacion: 1) El interesado ya informo su nombre (persona o razon social). 2) Ya entrego al menos un medio de contacto valido (correo electronico o telefono). 3) Ya expreso con claridad que servicio necesita (asesoria tributaria, cumplimiento y declaraciones, atencion de requerimientos DIAN, revisoria fiscal, auditoria o consultoria contable). 4) Ya definiste la clasificacion del lead (CALIENTE, TIBIO o FRIO) con base en lo que dijo: CALIENTE si hay un requerimiento, sancion o vencimiento cercano o necesidad inmediata de contratacion; TIBIO si hay una necesidad concreta sin fecha limite proxima; FRIO si solo pide informacion general. NO la uses en estos casos: saludos o preguntas generales sin datos de contacto; cuando falte alguno de los datos obligatorios (primero preguntalo al interesado); cuando el lead ya fue registrado en esta conversacion (no dupliques filas); cuando la persona solo pide precios o un concepto tecnico sin dejar datos de contacto; ni para consultar o modificar registros existentes, porque esta herramienta unicamente agrega filas nuevas. En los campos incluye solo informacion que el interesado haya dado de forma explicita. Si un dato opcional no fue suministrado, dejalo como No informado. El campo Motivo de escalamiento solo se completa cuando el caso requiere que un asesor humano intervenga (precios, concepto tecnico, urgencia DIAN).",
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1QSBu2jOAV9qL4vQEs8ufg-H-ziteW32NLAvUR9_4NrI"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Untitled"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Fecha": "={{ $now.toFormat(\"yyyy-MM-dd HH:mm\") }}",
+            "Nombre": "={{ $fromAI('nombre', 'Nombre de la persona o razon social del interesado') }}",
+            "Empresa": "={{ $fromAI('empresa', 'Empresa del interesado; si no la informo escribe No informado') }}",
+            "Contacto": "={{ $fromAI('contacto', 'Correo electronico o telefono entregado por el interesado') }}",
+            "Servicio": "={{ $fromAI('servicio', 'Servicio que solicita el interesado') }}",
+            "Clasificacion": "={{ $fromAI('clasificacion', 'CALIENTE, TIBIO o FRIO segun las reglas de clasificacion') }}",
+            "Urgente": "={{ $fromAI('urgente', 'Si o No; Si cuando exista requerimiento DIAN o vencimiento proximo') }}",
+            "Motivo de escalamiento": "={{ $fromAI('motivo_escalamiento', 'Motivo por el cual un asesor humano debe intervenir; No aplica si no corresponde') }}"
+          },
+          "schema": [
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Empresa",
+              "displayName": "Empresa",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contacto",
+              "displayName": "Contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Servicio",
+              "displayName": "Servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Clasificacion",
+              "displayName": "Clasificacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Urgente",
+              "displayName": "Urgente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Motivo de escalamiento",
+              "displayName": "Motivo de escalamiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        560
+      ],
+      "id": "9504961e-de1f-45ef-bd8e-599ee41d02f2",
+      "name": "Registrar_Lead_Sheets"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "jaagudelov@gmail.com",
+        "subject": "=[Log Agente] Sesion de calificacion de leads - {{ $now.toFormat(\"yyyy-MM-dd HH:mm\") }}",
+        "emailType": "text",
+        "message": "=REPORTE DE OBSERVABILIDAD DEL AGENTE\n\nMensaje del usuario:\n{{ $(\"Chat Trigger\").item.json.chatInput }}\n\nRespuesta final del agente:\n{{ $json.output }}\n\nPasos intermedios (Execution Log: herramienta invocada, entrada y resultado):\n{{ JSON.stringify($json.intermediateSteps ?? [], null, 2) }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        300
+      ],
+      "id": "421f818e-9167-4b69-865f-f23327bbcff9",
+      "name": "Gmail - Log de Observabilidad",
+      "webhookId": "9aac9a6d-5bbe-4405-912e-e5ab1a3a28d7"
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Log de Observabilidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar_Lead_Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
